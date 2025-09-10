@@ -1,3 +1,7 @@
+<?php 
+    require('db/conexao.php');
+?>
+
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -13,9 +17,54 @@
 <body>
 
     <main class="form-signin w-100 m-auto text-center mt-5">
-        <form method="post"> 
+        <form id="formLogin" method="post"> 
             <strong class="h1 fw-bolder">Blog</strong>
             <h1 class="h3 mb-3 fw-normal">Entrar na conta</h1>
+
+            <?php 
+                if(isset($_POST['login']) && isset($_POST['senha'])){
+                    $email = limparPost($_POST['login']);
+                    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        echo '<div class="alert alert-danger" role="alert">
+                                Email inválido!
+                            </div>';
+                    }
+                    $senha = limparPost($_POST['senha']);
+                    $senhaCriptografada = md5($senha);
+
+                    $sql = $pdo->prepare("SELECT * FROM administrativo WHERE email=? and senha=? LIMIT 1");
+                    $sql->execute(array($email, $senhaCriptografada));
+                    $quantos = $sql->rowCount();
+
+                    if($quantos == 1){
+                        $dados = $sql->fetchAll();
+                        session_start();
+                        $token = uniqid();
+                        $id = $dados[0]['id'];
+                        $_SESSION['token'] = $token;
+
+                        try{
+                        $sql = $pdo->prepare("UPDATE administrativo SET token=? WHERE id=?"); 
+                        $sql->execute(array($token, $id));
+                        header('location: plataforma\node_modules\admin-lte\dist\index.html');                   
+                    }
+
+                        catch(PDOException $e){
+                            echo '<div class="alert alert-danger" role="alert">
+                                Usuário ou senha inválida!
+                            </div>';                        
+                        }
+                     }else
+                    {
+                        echo '<div class="alert alert-danger" role="alert">
+                                Usuário ou senha inválida!
+                            </div>';                        
+                    }
+                }
+            ?>
+
+
+
             <div class="form-floating"> 
                 <input type="email" class="form-control" name="login" id="login" placeholder="name@example.com"> 
                 <label for="login">Email</label> 
@@ -54,6 +103,13 @@
             return emailReg.test( $email );
             }
 
+                $("#login").keyup(function(){
+                    $("#login").removeClass('is-invalid');
+                });
+                $("#senha").keyup(function(){
+                    $("#senha").removeClass('is-invalid');
+                });
+
                 $("#fazerLogin").click(function(){
                     var login = $("#login").val();
                     var senha = $("#senha").val();
@@ -63,6 +119,7 @@
                         $("#login").addClass('is-invalid');
                         $("#login").val('');
                         $("#login").focus();
+                        return false;
                     }else
                     {
                         if( !validateEmail(login)){
@@ -70,6 +127,7 @@
                             $("#login").addClass('is-invalid');
                             $("#login").val('');
                             $("#login").focus();
+                            return false;
                         }else
                         {
                             var emailok = "sim";
@@ -81,13 +139,14 @@
                         $("#senha").addClass('is-invalid');
                         $("#senha").val('');
                         $("#senha").focus();
+                        return false;
                     }else
                     {
                         var senhaok = "sim";
                     }
 
                     if(emailok == "sim" && senhaok == "sim"){
-                        alert("tudo certo no formulário");
+                        $("#formLogin").submit();
                     }
                 });
     </script>
