@@ -1,5 +1,21 @@
 <?php 
-    require('db/conexao.php');
+session_start();
+require('db/conexao.php');
+
+//VERIFICAMOS SE EXISTE A SESSAO TOKEN
+if(isset($_SESSION['token']) && isset($_SESSION['id'])){
+    //VERIFICAR SE A SESSION TOKEN É IGUAL A REGISTRADA NO BANCO
+    $tokenSessao = $_SESSION['token'];
+    $id = $_SESSION['id'];
+
+    $sql = $pdo->prepare('SELECT * from administrativo WHERE token=? AND id=? LIMIT 1');
+    $sql->execute(array($tokenSessao,$id));
+    $quantos = $sql->rowCount();
+    header('location: plataforma\index.php');
+
+}else{
+
+}
 ?>
 
 <!DOCTYPE html>
@@ -23,50 +39,68 @@
 
             <?php 
                 if(isset($_POST['login']) && isset($_POST['senha'])){
+
+                    
                     $email = limparPost($_POST['login']);
                     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                         echo '<div class="alert alert-danger" role="alert">
-                                Email inválido!
-                            </div>';
+                        Email inválido!
+                        </div>';
                     }
-                    $senha = limparPost($_POST['senha']);
-                    $senhaCriptografada = md5($senha);
+                    else{                     
+                        $senha = limparPost($_POST['senha']);
+                        $senhaCriptografada = md5($senha);
 
-                    $sql = $pdo->prepare("SELECT * FROM administrativo WHERE email=? and senha=? LIMIT 1");
-                    $sql->execute(array($email, $senhaCriptografada));
-                    $quantos = $sql->rowCount();
+                        $sql = $pdo->prepare("SELECT * FROM administrativo WHERE email=? and senha=? LIMIT 1");
+                        $sql->execute(array($email, $senhaCriptografada));
+                        $quantos = $sql->rowCount();
 
-                    if($quantos == 1){
-                        $dados = $sql->fetchAll();
-                        session_start();
-                        $token = uniqid();
-                        $id = $dados[0]['id'];
-                        $_SESSION['token'] = $token;
+                        if($quantos == 1){
+                            $dados = $sql->fetchAll();
+                            
+                            
+                            $hoje = date('d-m-Y-H-s-i');
+                            $token = md5(uniqid().$hoje);
+                            $id = $dados[0]['id'];
+                            $_SESSION['id'] = $id;
+                            $_SESSION['token'] = $token;
 
-                        try{
-                        $sql = $pdo->prepare("UPDATE administrativo SET token=? WHERE id=?"); 
-                        $sql->execute(array($token, $id));
-                        header('location: plataforma\node_modules\admin-lte\dist\index.html');                   
-                    }
+                            try{
+                                $sql = $pdo->prepare("UPDATE administrativo SET token=? WHERE id=?"); 
+                                $sql->execute(array($token, $id));
 
-                        catch(PDOException $e){
+                                //verifica se o lembrar de mim está ativo
+                                if(isset($_POST['login']) && isset($_POST['senha'])){
+                                    //salvar cookie
+                                    setcookie('lembrar-login', $email, time() + 86400 * 30);
+                                }
+                                else{
+                                    setcookie('lembrar-login', $email, time() - 3600);
+                                }
+
+                                header('location: plataforma\index.php');  
+                            }
+
+                            catch(PDOException $e){
+                                echo '<div class="alert alert-danger" role="alert">
+                                    Usuário ou senha inválida!
+                                </div>';                        
+                            }
+                        }else
+                        {
                             echo '<div class="alert alert-danger" role="alert">
-                                Usuário ou senha inválida!
-                            </div>';                        
+                                    Usuário ou senha inválida!
+                                </div>';                        
                         }
-                     }else
-                    {
-                        echo '<div class="alert alert-danger" role="alert">
-                                Usuário ou senha inválida!
-                            </div>';                        
                     }
+
                 }
             ?>
 
 
 
             <div class="form-floating"> 
-                <input type="email" class="form-control" name="login" id="login" placeholder="name@example.com"> 
+                <input type="email" class="form-control" name="login" id="login" placeholder="name@example.com" <?php if(isset($_COOKIE['lembrar-login'])){$emailcookie = $_COOKIE['lembrar-login'];echo "value='$emailcookie'";}?> required> 
                 <label for="login">Email</label> 
                 <div id="msg-login" class="invalid-feedback">
                     
@@ -79,7 +113,7 @@
 
                 </div>
             </div>
-            <div class="form-check text-start my-3"> <input class="form-check-input" type="checkbox" name="lembrar" value="Lembrar de mim"
+            <div class="form-check text-start my-3"> <input class="form-check-input" type="checkbox" name="lembrar" value="lembrar"
                     id="checkDefault"> <label class="form-check-label" for="checkDefault">
                     Lembrar-me
                 </label> 
